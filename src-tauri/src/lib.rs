@@ -6,6 +6,7 @@ mod commands;
 mod cursor;
 mod devin;
 mod opencode;
+mod platform;
 mod prefs;
 mod provider;
 mod tray;
@@ -169,7 +170,11 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            if cfg!(target_os = "windows") {
+                Some(vec!["--startup"])
+            } else {
+                None
+            },
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
@@ -191,6 +196,7 @@ pub fn run() {
             app.manage(tray::TrayMenuState::default());
             app.manage(tray::TrayRenderCache::default());
             app.manage(updates::UpdateStatus::default());
+            app.manage(platform::WidgetPlacement::default());
             let manager = CodexManager::new(app.handle().clone());
             app.manage(manager.clone());
             let claude_manager = ClaudeManager::new(app.handle().clone());
@@ -204,6 +210,14 @@ pub fn run() {
             let antigravity_manager = AntigravityManager::new(app.handle().clone());
             app.manage(antigravity_manager.clone());
             tray::setup(app)?;
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(widget) = app.get_webview_window("codex-widget") {
+                    widget.set_size(tauri::LogicalSize::new(224.0, 26.0))?;
+                    platform::position_codex_widget(app.handle())?;
+                    widget.show()?;
+                }
+            }
             updates::spawn_periodic_checks(&app.handle());
 
             #[cfg(target_os = "macos")]
@@ -233,10 +247,12 @@ pub fn run() {
                 );
             }
 
-            #[cfg(debug_assertions)]
-            if let Some(window) = app.get_webview_window("main") {
-                window.show()?;
-                window.set_focus()?;
+            #[cfg(any(debug_assertions, target_os = "windows"))]
+            if !cfg!(target_os = "windows") || !std::env::args_os().any(|arg| arg == "--startup") {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.show()?;
+                    window.set_focus()?;
+                }
             }
 
             // Both providers share one tray coordinator, so a single repaint per
@@ -250,6 +266,13 @@ pub fn run() {
                 loop {
                     interval.tick().await;
                     tray::refresh_unified_tray(&tray_handle).await;
+                    #[cfg(target_os = "windows")]
+                    if now_unix_seconds() % 5 == 0 {
+                        let handle = tray_handle.clone();
+                        let _ = tray_handle.run_on_main_thread(move || {
+                            let _ = platform::position_codex_widget(&handle);
+                        });
+                    }
                 }
             });
 
@@ -473,6 +496,11 @@ pub fn run() {
             commands::get_autostart,
             commands::set_autostart,
             commands::hide_window,
+            commands::show_dashboard,
+            commands::set_widget_expanded,
+            commands::drag_codex_widget,
+            commands::hide_codex_widget,
+            commands::reset_widget_position,
             commands::quit_app
         ])
         .run(tauri::generate_context!())

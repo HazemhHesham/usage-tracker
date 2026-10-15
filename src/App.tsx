@@ -42,6 +42,7 @@ function headerResetText(bucket: RateLimitBucket, now: number): string {
 }
 
 export default function App() {
+  const dismissLabel = "Hide to system tray";
   const { state, buckets, resetCredits, usage, refreshing, refresh } = useCodexMeter();
   const claude = useClaudeMeter();
   const cursor = useCursorMeter();
@@ -175,19 +176,19 @@ export default function App() {
     <main className="app-shell" data-tauri-drag-region>
       {/* The traffic-light corner: where macOS puts window chrome, so it is
           where the eye goes for "make this window go away". Hiding the popover
-          sends it back to the menu bar — the app keeps running, which is what
+          sends it back to the system tray — the app keeps running, which is what
           separates this from the power button in the footer. The chevron
           points at that home; the label spells it out on hover. */}
       <button
         type="button"
         className="dismiss-button"
-        aria-label="Hide UsageBar to the menu bar"
+        aria-label={dismissLabel}
         onClick={() => {
           if ("__TAURI_INTERNALS__" in window) void invoke("hide_window");
         }}
       >
         <ChevronUp size={15} strokeWidth={2.5} aria-hidden="true" />
-        <span className="dismiss-label">Hide to menu bar</span>
+        <span className="dismiss-label">{dismissLabel}</span>
       </button>
       <header
         className="app-header"
@@ -280,7 +281,7 @@ export default function App() {
             meter={claude}
             now={now}
             dense={prefs.denseLayout}
-            signedOutHint="the stored Claude Code login is stale. Click Refresh — macOS may ask once to read the Keychain item Claude Code already keeps. Always Allow stops that sheet. The desktop Claude app uses a different login than the `claude` CLI."
+            signedOutHint="the stored Claude Code login is stale. Open Claude Code to renew its login, then click Refresh. The desktop Claude app uses a different login than the `claude` CLI."
           />
         ) : null}
         {showCursor ? (
@@ -334,7 +335,7 @@ export default function App() {
             <p>
               {nothingEnabled
                 ? "Turn a tool back on in Settings to see its quota here."
-                : "UsageBar reads the logins Codex, Claude Code, Cursor, OpenCode Go, Devin, and Antigravity already keep on this Mac. Sign in to one of them, then refresh."}
+                : "UsageBar reads the logins Codex, Claude Code, Cursor, OpenCode Go, Devin, and Antigravity already keep on this computer. Sign in to one of them, then refresh."}
             </p>
             <button className="secondary-button" onClick={() => setOnboarding(true)}>
               Open setup guide

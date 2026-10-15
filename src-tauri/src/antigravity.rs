@@ -340,6 +340,7 @@ fn plan_from_status(value: &Value) -> String {
         .to_owned()
 }
 
+#[cfg(not(target_os = "windows"))]
 fn local_server_bases() -> Vec<String> {
     let Ok(output) = std::process::Command::new("lsof")
         .args(["-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcn"])
@@ -351,6 +352,29 @@ fn local_server_bases() -> Vec<String> {
         return Vec::new();
     };
     parse_lsof_bases(&text)
+}
+
+#[cfg(target_os = "windows")]
+fn local_server_bases() -> Vec<String> {
+    // Query listener ownership locally, without reading process command lines or tokens.
+    use std::os::windows::process::CommandExt;
+    let output = std::process::Command::new("powershell.exe")
+        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+            "$ids = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^(language_server.*|antigravity|agy)$' } | Select-Object -ExpandProperty Id); if ($ids.Count -gt 0) { Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $ids -contains $_.OwningProcess } | Select-Object -ExpandProperty LocalPort -Unique }"])
+        .creation_flags(0x08000000)
+        .output();
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| line.trim().parse::<u16>().ok())
+        .filter(|port| *port != 0)
+        .map(|port| format!("http://127.0.0.1:{port}"))
+        .collect()
 }
 
 fn parse_lsof_bases(output: &str) -> Vec<String> {
@@ -483,6 +507,7 @@ fn classify_keychain_status(code: i32) -> CredentialRead {
     ))
 }
 
+#[cfg(target_os = "macos")]
 fn read_keychain_password(allow_prompt: bool) -> CredentialRead {
     use security_framework::item::{ItemClass, ItemSearchOptions, SearchResult};
     use security_framework::os::macos::keychain::SecKeychain;
@@ -516,6 +541,11 @@ fn read_keychain_password(allow_prompt: bool) -> CredentialRead {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
+fn read_keychain_password(_allow_prompt: bool) -> CredentialRead {
+    CredentialRead::Absent
+}
+
 async fn load_from_keychain(allow_prompt: bool) -> CredentialRead {
     match tokio::task::spawn_blocking(move || read_keychain_password(allow_prompt)).await {
         Ok(read) => read,
@@ -526,14 +556,15 @@ async fn load_from_keychain(allow_prompt: bool) -> CredentialRead {
 }
 
 fn token_file_path() -> Option<std::path::PathBuf> {
-    let home = std::env::var_os("HOME")?;
+    let home = crate::platform::home_dir()?;
     Some(std::path::PathBuf::from(home).join(".gemini/antigravity-cli/antigravity-oauth-token"))
 }
 
 async fn load_from_file() -> CredentialRead {
     let Some(path) = token_file_path() else {
         return CredentialRead::Unavailable(
-            "HOME is not set, so the Antigravity token file could not be located".to_owned(),
+            "The home directory is unavailable, so the Antigravity token file could not be located"
+                .to_owned(),
         );
     };
     match tokio::fs::read(&path).await {

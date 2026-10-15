@@ -41,7 +41,7 @@ function StepWelcome() {
       </div>
       <h2>Welcome to UsageBar</h2>
       <p>
-        It keeps your coding-tool usage in the menu bar, so you can
+        It keeps your coding-tool usage in the system tray, so you can
         check it without running anything.
       </p>
       <ul className="onboard-list">
@@ -69,7 +69,7 @@ function StepProviders({ providers }: { providers: ProviderStatus[] }) {
       <h2>Connections</h2>
       <p>
         There is nothing to set up. UsageBar uses the logins these tools already
-        keep on this Mac. You can hide any of them later in Settings.
+        keep on this computer. You can hide any of them later in Settings.
       </p>
       <div className="onboard-providers">
         {providers.map((provider) => (
@@ -93,7 +93,7 @@ function StepProviders({ providers }: { providers: ProviderStatus[] }) {
         <KeyRound size={14} aria-hidden="true" />
         <p>
           Claude Code comes from the login the <code>claude</code> CLI already
-          keeps on this Mac. UsageBar only reads it, and only sends it to
+          keeps on this computer. UsageBar only reads it, and only sends it to
           Anthropic’s own usage endpoint — never to us.
         </p>
       </div>
@@ -130,7 +130,7 @@ function StepAlerts() {
           <span className="onboard-bullet">
             <Radio size={13} aria-hidden="true" />
           </span>
-          <span>A bolt shows up in the menu bar when a reset is on the way.</span>
+          <span>Open the dashboard to see when an announced reset is on the way.</span>
         </li>
         <li>
           <span className="onboard-bullet">
@@ -162,7 +162,7 @@ function StepSettings() {
       <h2>Settings</h2>
       <p>
         Open Settings from the button at the bottom of this window, or by
-        right-clicking a menu-bar icon.
+        right-clicking a tray icon.
       </p>
       <ul className="onboard-list">
         <li>
@@ -179,7 +179,7 @@ function StepSettings() {
             <Columns2 size={13} aria-hidden="true" />
           </span>
           <span>
-            <strong>Compact</strong> puts every visible tool under one menu-bar
+            <strong>Compact</strong> puts every visible tool under one tray
             icon; <strong>Extended</strong> gives each its own. Compact is less
             likely to get hidden when the bar is full.
           </span>
@@ -188,7 +188,7 @@ function StepSettings() {
           <span className="onboard-bullet">
             <Check size={13} aria-hidden="true" />
           </span>
-          <span>Turn on Launch at Login so it starts with your Mac.</span>
+          <span>Turn on Launch at Login so it starts with your computer.</span>
         </li>
       </ul>
       <p className="onboard-footnote">

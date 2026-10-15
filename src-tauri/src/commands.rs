@@ -179,11 +179,48 @@ pub fn open_post_url(url: String) -> Result<(), String> {
     if !is_openable_post_url(&url) {
         return Err("Only reset post links can be opened.".to_owned());
     }
-    std::process::Command::new("/usr/bin/open")
-        .arg(&url)
-        .spawn()
-        .map(|_| ())
-        .map_err(|error| error.to_string())
+    #[cfg(target_os = "windows")]
+    {
+        #[link(name = "shell32")]
+        extern "system" {
+            fn ShellExecuteW(
+                hwnd: *mut std::ffi::c_void,
+                operation: *const u16,
+                file: *const u16,
+                parameters: *const u16,
+                directory: *const u16,
+                show: i32,
+            ) -> isize;
+        }
+        let url: Vec<u16> = url.encode_utf16().chain(Some(0)).collect();
+        let result = unsafe {
+            ShellExecuteW(
+                std::ptr::null_mut(),
+                std::ptr::null(),
+                url.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                1,
+            )
+        };
+        if result <= 32 {
+            return Err(format!("Could not open browser (Windows error {result})"));
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let opener = if cfg!(target_os = "macos") {
+            "/usr/bin/open"
+        } else {
+            "xdg-open"
+        };
+        std::process::Command::new(opener)
+            .arg(&url)
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| error.to_string())
+    }
 }
 
 #[tauri::command]
@@ -279,6 +316,117 @@ pub fn hide_window(app: AppHandle) {
     }
     #[cfg(target_os = "macos")]
     crate::hide_app();
+}
+
+#[tauri::command]
+pub fn set_widget_expanded(app: AppHandle, expanded: bool) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    if let Some(window) = app.get_webview_window("codex-widget") {
+        let anchor = window.outer_position().map_err(|error| error.to_string())?;
+        let old_size = window.outer_size().map_err(|error| error.to_string())?;
+        let (width, height) = if expanded {
+            (354.0, 148.0)
+        } else {
+            (224.0, 26.0)
+        };
+        window
+            .set_size(tauri::LogicalSize::new(width, height))
+            .map_err(|error| error.to_string())?;
+        let new_size = window.outer_size().map_err(|error| error.to_string())?;
+        window
+            .set_position(tauri::PhysicalPosition::new(
+                anchor.x + old_size.width as i32 - new_size.width as i32,
+                anchor.y + old_size.height as i32 - new_size.height as i32,
+            ))
+            .map_err(|error| error.to_string())?;
+        crate::platform::position_codex_widget(&app).map_err(|error| error.to_string())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = (app, expanded);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn drag_codex_widget(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("codex-widget") {
+        app.state::<crate::platform::WidgetPlacement>()
+            .manually_moved
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        #[cfg(target_os = "windows")]
+        {
+            #[repr(C)]
+            struct Point {
+                x: i32,
+                y: i32,
+            }
+            #[link(name = "user32")]
+            extern "system" {
+                fn GetCursorPos(point: *mut Point) -> i32;
+                fn ReleaseCapture() -> i32;
+                fn SendMessageW(
+                    window: *mut std::ffi::c_void,
+                    message: u32,
+                    wparam: usize,
+                    lparam: isize,
+                ) -> isize;
+            }
+            let handle = window.hwnd().map_err(|error| error.to_string())?;
+            let mut point = Point { x: 0, y: 0 };
+            unsafe {
+                if GetCursorPos(&mut point) == 0 {
+                    return Err("Could not locate the pointer".into());
+                }
+                ReleaseCapture();
+                // WM_NCLBUTTONDOWN takes packed screen coordinates. The native
+                // move loop returns on release, keeping hover expansion stable.
+                let coordinates =
+                    ((point.x as u32 & 0xffff) | ((point.y as u32 & 0xffff) << 16)) as i32 as isize;
+                SendMessageW(handle.0, 0x00A1, 2, coordinates);
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        window.start_dragging().map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn hide_codex_widget(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("codex-widget") {
+        window.hide().map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn reset_widget_position(app: AppHandle) -> Result<(), String> {
+    app.state::<crate::platform::WidgetPlacement>()
+        .manually_moved
+        .store(false, std::sync::atomic::Ordering::Relaxed);
+    #[cfg(target_os = "windows")]
+    crate::platform::position_codex_widget(&app).map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+pub fn show_codex_widget(app: &AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    crate::platform::position_codex_widget(app).map_err(|error| error.to_string())?;
+    if let Some(window) = app.get_webview_window("codex-widget") {
+        window.show().map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn show_dashboard(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        #[cfg(target_os = "macos")]
+        crate::activate_app();
+        window.show().map_err(|error| error.to_string())?;
+        window.unminimize().map_err(|error| error.to_string())?;
+        window.set_focus().map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

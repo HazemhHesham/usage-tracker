@@ -92,7 +92,7 @@ pub fn with_incoming_prefix(title: String, incoming: bool) -> String {
 
 fn toggle_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
-        if window.is_visible().unwrap_or(false) {
+        if window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false) {
             let _ = window.hide();
             // Same dismissal as the close button: give the menu bar and the
             // keyboard back to whatever the user was working in.
@@ -104,6 +104,7 @@ fn toggle_main_window(app: &AppHandle) {
             #[cfg(target_os = "macos")]
             crate::activate_app();
             let _ = window.show();
+            let _ = window.unminimize();
             let _ = window.set_focus();
         }
     }
@@ -379,6 +380,16 @@ fn build_unified_menu(
 
     use tauri::menu::IsMenuItem;
     let mut items: Vec<&dyn IsMenuItem<tauri::Wry>> = vec![&refresh, &sep_after_refresh];
+    #[cfg(target_os = "windows")]
+    let show_widget = MenuItem::with_id(
+        app,
+        "show-codex-widget",
+        "Show Codex meter",
+        true,
+        None::<&str>,
+    )?;
+    #[cfg(target_os = "windows")]
+    items.push(&show_widget);
     for picker in &pickers {
         items.push(picker);
     }
@@ -437,7 +448,7 @@ fn build_provider_menu(
     let walkthrough =
         MenuItem::with_id(app, "show-onboarding", "Setup Guide…", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit-app", "Quit UsageBar", true, None::<&str>)?;
-    let items: Vec<&dyn IsMenuItem<tauri::Wry>> = vec![
+    let mut items: Vec<&dyn IsMenuItem<tauri::Wry>> = vec![
         &refresh,
         &sep_after_refresh,
         &picker,
@@ -450,6 +461,16 @@ fn build_provider_menu(
         &walkthrough,
         &quit,
     ];
+    #[cfg(target_os = "windows")]
+    let show_widget = MenuItem::with_id(
+        app,
+        "show-codex-widget",
+        "Show Codex meter",
+        true,
+        None::<&str>,
+    )?;
+    #[cfg(target_os = "windows")]
+    items.insert(0, &show_widget);
     Menu::with_items(app, &items)
 }
 
@@ -654,6 +675,18 @@ fn paint(app: &AppHandle, id: &'static str, title: &str, tooltip: &str) {
     let _ = app.run_on_main_thread(move || {
         if let Some(tray) = handle.tray_by_id(id) {
             let _ = tray.set_title(Some(title));
+            // Shell_NotifyIcon limits tooltip text to 127 UTF-16 code units.
+            #[cfg(target_os = "windows")]
+            let tooltip: String = {
+                let mut units = 0;
+                tooltip
+                    .chars()
+                    .take_while(|c| {
+                        units += c.len_utf16();
+                        units <= 127
+                    })
+                    .collect()
+            };
             let _ = tray.set_tooltip(Some(tooltip));
         }
     });
@@ -940,9 +973,13 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
                 #[cfg(target_os = "macos")]
                 crate::activate_app();
                 let _ = window.show();
+                let _ = window.unminimize();
                 let _ = window.set_focus();
             }
             let _ = app.emit("usagebar://show-onboarding", ());
+        }
+        "show-codex-widget" => {
+            let _ = crate::commands::show_codex_widget(app);
         }
         "quit-app" => quit_from_menu(app),
         _ => {}

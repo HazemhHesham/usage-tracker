@@ -9,7 +9,9 @@
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run && node --test tools/tibo-watch/lib.test.mjs",
     "test:watch": "vitest",
-    "tauri": "./tools/tauri.sh",
+    "tauri": "node ./tools/tauri.mjs",
+    "windows:build": "npm run tauri build -- --bundles nsis",
+    "windows:install": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tools/install-windows.ps1",
     "app:install": "npm run tauri build -- --bundles app && ./tools/install-app.sh",
     "mas:build": "bash ./tools/mas-build.sh"
   },

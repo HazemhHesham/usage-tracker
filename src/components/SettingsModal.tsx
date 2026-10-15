@@ -77,7 +77,7 @@ function WindowPicker({
   return (
     <div className="setting-group">
       <span className="setting-label">{title}</span>
-      <div className="window-picker" role="radiogroup" aria-label={`${title} menu-bar window`}>
+      <div className="window-picker" role="radiogroup" aria-label={`${title} tray window`}>
         {options.map((option) => {
           const active = option.id === selected;
           return (
@@ -232,8 +232,8 @@ export function SettingsModal({
 
   const testMessage: Record<TestNotificationResult | "sending", string> = {
     sending: "Sending…",
-    sent: "Sent. If nothing appeared, check Focus and System Settings › Notifications › UsageBar.",
-    denied: "Notifications are off for UsageBar. Turn them on in System Settings › Notifications.",
+    sent: "Sent. If nothing appeared, check Focus and notification settings › UsageBar.",
+    denied: "Notifications are off for UsageBar. Turn them on in notification settings.",
     unavailable: "Couldn't send a notification from this build.",
   };
 
@@ -267,7 +267,7 @@ export function SettingsModal({
 
         <div className="settings-body">
           <p className="settings-intro">
-            Choose which tools to track. Hidden tools stay off the menu bar and
+            Choose which tools to track. Hidden tools stay off the system tray and
             are not polled. Each visible meter can follow a specific quota
             window, or whichever one you are closest to using up.
           </p>
@@ -279,8 +279,8 @@ export function SettingsModal({
               const found = windows[tool.id].length > 0;
               const detail = on
                 ? found
-                  ? "Shown in the popover and menu bar."
-                  : "On — looking for a login on this Mac."
+                  ? "Shown in the popover and system tray."
+                  : "On — looking for a login on this computer."
                 : "Hidden. Turn on to track this tool.";
               return (
                 <Toggle
@@ -340,8 +340,8 @@ export function SettingsModal({
             />
             <p className="setting-hint">
               {visibleCount > 2
-                ? "With several tools on, Compact is much less likely to be hidden when the menu bar is crowded."
-                : "Compact is less likely to be hidden when the menu bar is crowded."}
+                ? "With several tools on, Compact is much less likely to be hidden when the system tray is crowded."
+                : "Compact is less likely to be hidden when the system tray is crowded."}
             </p>
           </div>
 

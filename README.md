@@ -1,5 +1,16 @@
 # UsageBar
 
+**Windows port:** This checkout now includes a Windows system-tray version.
+Start with [the Windows setup and usage guide](docs/WINDOWS.md). On Windows,
+run `npm ci`, then `npm run tauri dev` (development) or
+`npm run windows:build` (installer), after installing the prerequisites in that guide.
+The Windows installer is generated locally; the upstream macOS releases below
+do not contain this port. Native Windows checks, installer packaging, and the
+installed app launch pass; provider logins still need validation across supported
+tool versions before a public Windows release.
+
+The original macOS documentation follows.
+
 **Codex, Claude, Cursor, OpenCode, Devin, and Antigravity quota windows and reset times, at a glance.**
 
 UsageBar is a small, local-first macOS menu-bar app for seeing current AI-coding quota windows, how much remains, and exactly when each window resets. Codex data comes from your existing Codex login through the official Codex App Server—no OpenAI API key and no credential scraping. If Claude Code, Cursor, OpenCode Go, the Devin CLI, or Google Antigravity is signed in on this Mac, those meters show up too.

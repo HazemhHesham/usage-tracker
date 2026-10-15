@@ -125,7 +125,7 @@ impl ClaudeManager {
                 if hides_tray(has_shown_usage, reads) {
                     self.set_connection(
                         ConnectionState::CliNotFound,
-                        Some("No Claude Code login was found on this Mac".into()),
+                        Some("No Claude Code login was found on this computer".into()),
                     )
                     .await;
                     return Ok(self.snapshot().await);
@@ -144,7 +144,7 @@ impl ClaudeManager {
                 ) {
                     self.set_connection(
                         ConnectionState::CliNotFound,
-                        Some("No Claude Code login was found on this Mac".into()),
+                        Some("No Claude Code login was found on this computer".into()),
                     )
                     .await;
                     return Ok(self.snapshot().await);
@@ -360,6 +360,7 @@ fn classify_keychain_status(code: i32) -> CredentialRead {
     ))
 }
 
+#[cfg(target_os = "macos")]
 fn read_keychain_password(allow_prompt: bool) -> CredentialRead {
     use security_framework::item::{ItemClass, ItemSearchOptions, SearchResult};
     use security_framework::os::macos::keychain::SecKeychain;
@@ -394,6 +395,11 @@ fn read_keychain_password(allow_prompt: bool) -> CredentialRead {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
+fn read_keychain_password(_allow_prompt: bool) -> CredentialRead {
+    CredentialRead::Absent
+}
+
 async fn load_from_keychain(allow_prompt: bool) -> CredentialRead {
     match tokio::task::spawn_blocking(move || read_keychain_password(allow_prompt)).await {
         Ok(read) => read,
@@ -404,12 +410,16 @@ async fn load_from_keychain(allow_prompt: bool) -> CredentialRead {
 }
 
 async fn load_from_file() -> CredentialRead {
-    let Some(home) = std::env::var_os("HOME") else {
+    let Some(home) = crate::platform::home_dir() else {
         return CredentialRead::Unavailable(
-            "HOME is not set, so the Claude Code credentials file could not be located".to_owned(),
+            "The home directory is unavailable, so the Claude Code credentials file could not be located".to_owned(),
         );
     };
-    let path = std::path::PathBuf::from(home).join(".claude/.credentials.json");
+    let directory = std::env::var_os("CLAUDE_CONFIG_DIR")
+        .filter(|value| !value.is_empty())
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| home.join(".claude"));
+    let path = directory.join(".credentials.json");
     match tokio::fs::read_to_string(&path).await {
         Ok(contents) => match parse_credentials(&contents) {
             Some(credentials) => CredentialRead::Found(credentials),

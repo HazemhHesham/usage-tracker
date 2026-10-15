@@ -1,0 +1,40 @@
+html[data-widget], html[data-widget] body { background: #1c1d23; color-scheme: dark; }
+.codex-widget { height: 100%; padding: 7px 8px; color: #f6f4ff; background: #1c1d23; border: 1px solid #ffffff1f; border-radius: 10px; font-family: "Segoe UI", sans-serif; user-select: none; }
+.quota-normal { --quota-color: #b9a5fa; }
+.quota-warning { --quota-color: #eab66e; }
+.quota-danger { --quota-color: #f58391; }
+.widget-header { height: 27px; display: flex; align-items: center; gap: 5px; padding: 0 2px; }
+.widget-dashboard { display: flex; align-items: center; gap: 7px; padding: 3px 0; color: #f6f4ff; }
+.widget-dashboard strong { font-size: 12px; font-weight: 650; }
+.widget-dashboard svg { color: #aaa3c5; }
+.widget-dashboard:hover strong { color: #c0afff; }
+.widget-dot { width: 6px; height: 6px; background: #9de0be; border-radius: 50%; }
+.widget-dot-stale { background: #e9bb76; }
+.widget-status { margin-left: auto; padding: 2px 6px; border: 1px solid #8ed8b32e; border-radius: 999px; background: #78c99d12; color: #9de0be; font-size: 9px; line-height: 12px; white-space: nowrap; }
+.widget-status-stale { border-color: #e9bb7635; background: #e9bb7612; color: #e9bb76; }
+.widget-actions { display: flex; align-items: center; gap: 1px; padding: 1px; border: 1px solid #ffffff0d; border-radius: 6px; background: #ffffff06; }
+.widget-refresh { color: #aaa3bd; padding: 3px; display: flex; border-radius: 4px; }
+.widget-refresh:hover { background: #ffffff16; }
+.widget-refreshing svg { animation: widget-spin 1s linear infinite; }
+@keyframes widget-spin { to { transform: rotate(360deg); } }
+.widget-quota { position: relative; display: grid; grid-template-columns: 47px 70px minmax(0, 1fr); gap: 6px; align-items: center; min-height: 50px; margin-top: 4px; padding: 5px 8px 7px; border: 1px solid #ffffff12; border-radius: 7px; background: linear-gradient(100deg, #ffffff09, #ffffff04); overflow: hidden; font-variant-numeric: tabular-nums; }
+.widget-window { color: #eeeaf7; font-size: 11px; font-weight: 650; }
+.widget-window small, .widget-percent small { display: block; color: #8f8a9f; font-size: 8px; font-weight: 500; line-height: 11px; text-transform: uppercase; letter-spacing: .35px; }
+.widget-percent { color: var(--quota-color); font-size: 19px; font-weight: 680; line-height: 19px; }
+.widget-reset { display: flex; flex-direction: column; gap: 2px; text-align: right; color: #e7e2ef; font-size: 10px; line-height: 14px; white-space: nowrap; }
+.widget-reset small { color: #9f99ad; font-size: 9px; overflow: hidden; text-overflow: ellipsis; }
+.widget-quota-track { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 2px; border-radius: 2px; background: #ffffff0c; overflow: hidden; }
+.widget-quota-track i { display: block; height: 100%; border-radius: inherit; background: var(--quota-color); opacity: .78; transition: width .3s ease; }
+.widget-collapsed { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 4px; border-radius: 6px 6px 0 0; }
+.widget-compact-brand { flex: none; display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 650; color: #e6defd; padding: 0; }
+.widget-compact-brand .widget-dot { width: 4px; height: 4px; }
+.widget-compact-quotas { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.widget-compact-row { position: relative; display: flex; align-items: center; gap: 4px; height: 20px; padding: 0 4px 1px; border: 1px solid #b5abc638; border-radius: 5px; background: #ffffff0b; overflow: hidden; font-size: 10px; line-height: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.widget-compact-row > span:first-child { color: #9b9ba8; font-size: 9px; font-weight: 500; }
+.widget-compact-row strong { color: var(--quota-color); font-size: 11px; font-weight: 650; }
+.widget-compact-row time { color: #a9a9b6; text-align: right; font-size: 10px; }
+.widget-chip-track { position: absolute; left: 4px; right: 4px; bottom: 0; height: 1px; background: #ffffff0b; }
+.widget-chip-track i { display: block; height: 100%; background: var(--quota-color); opacity: .7; transition: width .3s ease; }
+.widget-drag { flex: none; display: flex; align-items: center; color: #aaa3bd; cursor: grab; padding: 4px 0; }
+.widget-drag:active { cursor: grabbing; }
+.widget-close:hover { background: #a23d52; color: white; }
