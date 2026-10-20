@@ -91,7 +91,7 @@ impl AntigravityManager {
         }
 
         let _guard = self.refresh_lock.lock().await;
-        if let Some(local) = fetch_local_usage(&self.client).await {
+        if let Some(local) = fetch_local_usage().await {
             self.publish(&local.plan, local.payload).await?;
             return Ok(self.snapshot().await);
         }
@@ -273,14 +273,20 @@ struct LocalUsage {
 
 /// Asks a running Antigravity app, IDE, or `agy` session for quota. The app
 /// login never leaves the machine: the language server is already signed in.
-async fn fetch_local_usage(client: &reqwest::Client) -> Option<LocalUsage> {
-    for base in local_server_bases() {
-        let csrf = fetch_local_csrf(client, &base).await;
-        let Some(status) = post_local_rpc(client, &base, csrf.as_deref(), LOCAL_STATUS_RPC).await
+async fn fetch_local_usage() -> Option<LocalUsage> {
+    let client = local_http_client();
+    for endpoint in local_server_endpoints() {
+        let csrf = match endpoint.csrf {
+            Some(token) => Some(token),
+            None => fetch_local_csrf(&client, &endpoint.base).await,
+        };
+        let Some(status) =
+            post_local_rpc(&client, &endpoint.base, csrf.as_deref(), LOCAL_STATUS_RPC).await
         else {
             continue;
         };
-        let Some(quota) = post_local_rpc(client, &base, csrf.as_deref(), LOCAL_QUOTA_RPC).await
+        let Some(quota) =
+            post_local_rpc(&client, &endpoint.base, csrf.as_deref(), LOCAL_QUOTA_RPC).await
         else {
             continue;
         };
@@ -293,6 +299,25 @@ async fn fetch_local_usage(client: &reqwest::Client) -> Option<LocalUsage> {
         });
     }
     None
+}
+
+/// Antigravity's gRPC listener uses a short-lived self-signed certificate.
+/// This client is used only with hard-coded loopback hosts discovered from a
+/// local Antigravity process; the normal Cloud Code client still validates TLS.
+fn local_http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .user_agent(concat!("usagebar/", env!("CARGO_PKG_VERSION")))
+        .danger_accept_invalid_certs(true)
+        .no_proxy()
+        .build()
+        .expect("local reqwest client construction is infallible with these options")
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct LocalEndpoint {
+    base: String,
+    csrf: Option<String>,
 }
 
 async fn fetch_local_csrf(client: &reqwest::Client, base: &str) -> Option<String> {
@@ -341,7 +366,7 @@ fn plan_from_status(value: &Value) -> String {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn local_server_bases() -> Vec<String> {
+fn local_server_endpoints() -> Vec<LocalEndpoint> {
     let Ok(output) = std::process::Command::new("lsof")
         .args(["-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcn"])
         .output()
@@ -352,11 +377,37 @@ fn local_server_bases() -> Vec<String> {
         return Vec::new();
     };
     parse_lsof_bases(&text)
+        .into_iter()
+        .map(|base| LocalEndpoint { base, csrf: None })
+        .collect()
 }
 
 #[cfg(target_os = "windows")]
-fn local_server_bases() -> Vec<String> {
-    // Query listener ownership locally, without reading process command lines or tokens.
+fn local_server_endpoints() -> Vec<LocalEndpoint> {
+    let ports = windows_listener_ports();
+    let mut endpoints = windows_logged_endpoints();
+
+    // Keep compatibility with the standalone app and older IDE builds that
+    // expose the token from their loopback root. Newer IDE builds are handled
+    // above from their own private launch log. HTTPS is tried before HTTP
+    // because Antigravity labels its primary RPC listener as HTTPS.
+    for port in ports {
+        for scheme in ["https", "http"] {
+            let endpoint = LocalEndpoint {
+                base: format!("{scheme}://127.0.0.1:{port}"),
+                csrf: None,
+            };
+            if !endpoints.contains(&endpoint) {
+                endpoints.push(endpoint);
+            }
+        }
+    }
+    endpoints
+}
+
+#[cfg(target_os = "windows")]
+fn windows_listener_ports() -> Vec<u16> {
+    // Query listener ownership locally without exposing process arguments.
     use std::os::windows::process::CommandExt;
     let output = std::process::Command::new("powershell.exe")
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
@@ -373,8 +424,68 @@ fn local_server_bases() -> Vec<String> {
         .lines()
         .filter_map(|line| line.trim().parse::<u16>().ok())
         .filter(|port| *port != 0)
-        .map(|port| format!("http://127.0.0.1:{port}"))
         .collect()
+}
+
+/// Antigravity IDE 2.5+ protects both local RPC listeners with a CSRF token.
+/// The extension records that token and the paired HTTP port in its private
+/// per-session launch log. Reading this is equivalent to reading the token
+/// from the old loopback landing page, and it never leaves this process.
+#[cfg(target_os = "windows")]
+fn windows_logged_endpoints() -> Vec<LocalEndpoint> {
+    let Some(app_data) = std::env::var_os("APPDATA") else {
+        return Vec::new();
+    };
+    let logs = std::path::PathBuf::from(app_data)
+        .join("Antigravity IDE")
+        .join("logs");
+    let Ok(sessions) = std::fs::read_dir(logs) else {
+        return Vec::new();
+    };
+    let mut logs: Vec<_> = sessions
+        .filter_map(Result::ok)
+        .map(|entry| entry.path().join("ls-main.log"))
+        .filter(|path| path.is_file())
+        .collect();
+    logs.sort_by_key(|path| {
+        std::fs::metadata(path)
+            .and_then(|metadata| metadata.modified())
+            .ok()
+    });
+    logs.reverse();
+
+    logs.into_iter()
+        .take(8)
+        .filter_map(|path| std::fs::read_to_string(path).ok())
+        .filter_map(|text| parse_language_server_log(&text))
+        .collect()
+}
+
+fn parse_language_server_log(text: &str) -> Option<LocalEndpoint> {
+    let csrf = text.lines().rev().find_map(|line| {
+        let mut words = line.split_whitespace();
+        while let Some(word) = words.next() {
+            if word == "--csrf_token" {
+                return words
+                    .next()
+                    .filter(|token| !token.is_empty())
+                    .map(str::to_owned);
+            }
+        }
+        None
+    })?;
+    let port = text.lines().rev().find_map(|line| {
+        let prefix = "listening on random port at ";
+        let (_, rest) = line.split_once(prefix)?;
+        if !rest.contains(" for HTTP") || rest.contains(" for HTTPS") {
+            return None;
+        }
+        rest.split_whitespace().next()?.parse::<u16>().ok()
+    })?;
+    Some(LocalEndpoint {
+        base: format!("http://127.0.0.1:{port}"),
+        csrf: Some(csrf),
+    })
 }
 
 fn parse_lsof_bases(output: &str) -> Vec<String> {
@@ -1165,6 +1276,34 @@ n[::1]:43124
                 "http://127.0.0.1:43124".to_owned(),
                 "http://127.0.0.1:53111".to_owned(),
             ]
+        );
+    }
+
+    #[test]
+    fn reads_the_current_http_port_and_csrf_from_an_ide_launch_log() {
+        let log = r#"
+2026-10-20 [info] [LS Main] Args: --csrf_token secret-value --extension_server_port 53570
+server.go:561] Language server listening on random port at 53572 for HTTPS (gRPC)
+server.go:569] Language server listening on random port at 53573 for HTTP
+"#;
+        assert_eq!(
+            parse_language_server_log(log),
+            Some(LocalEndpoint {
+                base: "http://127.0.0.1:53573".to_owned(),
+                csrf: Some("secret-value".to_owned()),
+            })
+        );
+    }
+
+    #[test]
+    fn ignores_incomplete_ide_launch_logs() {
+        assert_eq!(
+            parse_language_server_log("Language server listening on random port at 53573 for HTTP"),
+            None
+        );
+        assert_eq!(
+            parse_language_server_log("Args: --csrf_token secret-value"),
+            None
         );
     }
 

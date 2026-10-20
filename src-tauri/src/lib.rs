@@ -213,7 +213,7 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             {
                 if let Some(widget) = app.get_webview_window("codex-widget") {
-                    widget.set_size(tauri::LogicalSize::new(224.0, 26.0))?;
+                    widget.set_size(tauri::LogicalSize::new(328.0, 26.0))?;
                     platform::position_codex_widget(app.handle())?;
                     widget.show()?;
                 }

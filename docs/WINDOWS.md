@@ -49,7 +49,7 @@ At least one provider must have a supported local login to show real usage.
 | Cursor | `%APPDATA%\Cursor\User\globalStorage\state.vscdb`. Sign in inside Cursor. |
 | OpenCode Go | `%USERPROFILE%\.local\share\opencode\auth.json`, or `%XDG_DATA_HOME%\opencode\auth.json`. Requires a Go login, rather than a Zen entry. |
 | Devin CLI | `%USERPROFILE%\.local\share\devin\credentials.toml`, or `%XDG_DATA_HOME%\devin\credentials.toml`. Requires a CLI that writes this supported format. |
-| Antigravity | Keep the signed-in Windows app running. UsageBar discovers its local listener through PowerShell. A still-valid token in `%USERPROFILE%\.gemini\antigravity-cli\antigravity-oauth-token` is also supported. |
+| Antigravity | Keep the signed-in Windows app or IDE running. UsageBar discovers its loopback listener and, for newer IDE builds, reads the short-lived local CSRF token from Antigravity's own session log. A still-valid token in `%USERPROFILE%\.gemini\antigravity-cli\antigravity-oauth-token` is also supported. |
 
 Windows home directories use `USERPROFILE`, with `HOME` as a fallback.
 macOS Keychain integration is skipped on Windows. Tools installed and signed in

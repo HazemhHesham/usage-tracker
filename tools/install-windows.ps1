@@ -21,10 +21,12 @@ try {
     $installDirectory = Join-Path $env:LOCALAPPDATA 'UsageBar'
     $installedExecutable = Join-Path $installDirectory 'UsageBar.exe'
     New-Item -ItemType Directory -Path $installDirectory -Force | Out-Null
-    Get-Process -Name usagebar -ErrorAction SilentlyContinue |
-        Where-Object { $_.Path -eq $installedExecutable } |
-        Stop-Process -PassThru |
-        Wait-Process -Timeout 15
+    $running = Get-Process -Name usagebar -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -eq $installedExecutable }
+    if ($running) {
+        $running | Stop-Process -Force -PassThru | Wait-Process -Timeout 15
+        Start-Sleep -Milliseconds 500
+    }
     Copy-Item -LiteralPath $sourceExecutable -Destination $installedExecutable -Force
 
     # Match the existing Launch at Login toggle, which uses the product name.
@@ -44,7 +46,14 @@ try {
     if ((Get-ItemPropertyValue -Path $runKey -Name $appName) -ne $startupCommand) {
         throw 'Windows startup registration could not be verified.'
     }
-    Start-Process -FilePath $installedExecutable -ArgumentList '--startup'
+    $started = $false
+    try {
+        $res = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "`"$installedExecutable`" --startup" }
+        if ($res.ReturnValue -eq 0) { $started = $true }
+    } catch {}
+    if (-not $started) {
+        Start-Process -FilePath $installedExecutable -ArgumentList '--startup'
+    }
     Write-Output "Installed: $installedExecutable"
     Write-Output 'Launch at Login enabled for the current Windows user.'
     Write-Output 'UsageBar starts with the meter visible and dashboard hidden.'

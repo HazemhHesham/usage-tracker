@@ -319,30 +319,25 @@ pub fn hide_window(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn set_widget_expanded(app: AppHandle, expanded: bool) -> Result<(), String> {
+pub fn set_widget_expanded(
+    app: AppHandle,
+    expanded: bool,
+    width: Option<f64>,
+    height: Option<f64>,
+) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     if let Some(window) = app.get_webview_window("codex-widget") {
-        let anchor = window.outer_position().map_err(|error| error.to_string())?;
-        let old_size = window.outer_size().map_err(|error| error.to_string())?;
-        let (width, height) = if expanded {
-            (354.0, 148.0)
-        } else {
-            (224.0, 26.0)
-        };
+        let default_width = if expanded { 354.0 } else { 328.0 };
+        let default_height = if expanded { 160.0 } else { 26.0 };
+        let target_width = width.unwrap_or(default_width);
+        let target_height = height.unwrap_or(default_height);
         window
-            .set_size(tauri::LogicalSize::new(width, height))
-            .map_err(|error| error.to_string())?;
-        let new_size = window.outer_size().map_err(|error| error.to_string())?;
-        window
-            .set_position(tauri::PhysicalPosition::new(
-                anchor.x + old_size.width as i32 - new_size.width as i32,
-                anchor.y + old_size.height as i32 - new_size.height as i32,
-            ))
+            .set_size(tauri::LogicalSize::new(target_width, target_height))
             .map_err(|error| error.to_string())?;
         crate::platform::position_codex_widget(&app).map_err(|error| error.to_string())?;
     }
     #[cfg(not(target_os = "windows"))]
-    let _ = (app, expanded);
+    let _ = (app, expanded, width, height);
     Ok(())
 }
 
