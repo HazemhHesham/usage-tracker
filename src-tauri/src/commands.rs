@@ -404,11 +404,12 @@ pub fn reset_widget_position(app: AppHandle) -> Result<(), String> {
 }
 
 pub fn show_codex_widget(app: &AppHandle) -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    crate::platform::position_codex_widget(app).map_err(|error| error.to_string())?;
     if let Some(window) = app.get_webview_window("codex-widget") {
         window.show().map_err(|error| error.to_string())?;
+        let _ = window.unminimize();
     }
+    #[cfg(target_os = "windows")]
+    let _ = crate::platform::position_codex_widget(app);
     Ok(())
 }
 

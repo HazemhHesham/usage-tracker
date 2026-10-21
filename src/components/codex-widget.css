@@ -1,5 +1,5 @@
 html[data-widget], html[data-widget] body {
-  background: #1c1d23;
+  background: #121215;
   color-scheme: dark;
   margin: 0;
   padding: 0;
@@ -10,9 +10,9 @@ html[data-widget], html[data-widget] body {
   box-sizing: border-box;
   height: 100%;
   padding: 7px 8px;
-  color: #f6f4ff;
-  background: #1c1d23;
-  border: 1px solid #ffffff1f;
+  color: #f1f5f9;
+  background: #121215;
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 10px;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   user-select: none;
@@ -20,9 +20,9 @@ html[data-widget], html[data-widget] body {
   flex-direction: column;
 }
 
-.quota-normal { --quota-color: #b9a5fa; }
-.quota-warning { --quota-color: #f6c453; }
-.quota-danger { --quota-color: #f77272; }
+.quota-normal { --quota-color: #38bdf8; }
+.quota-warning { --quota-color: #f6c453 !important; }
+.quota-danger { --quota-color: #f77272 !important; }
 
 .widget-header {
   height: 27px;
@@ -38,7 +38,7 @@ html[data-widget], html[data-widget] body {
   align-items: center;
   gap: 7px;
   padding: 3px 0;
-  color: #f6f4ff;
+  color: #f1f5f9;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -50,11 +50,11 @@ html[data-widget], html[data-widget] body {
 }
 
 .widget-dashboard svg {
-  color: #aaa3c5;
+  color: #94a3b8;
 }
 
 .widget-dashboard:hover strong {
-  color: #c0afff;
+  color: #ffffff;
 }
 
 .widget-dot {
@@ -99,7 +99,7 @@ html[data-widget], html[data-widget] body {
 }
 
 .widget-refresh {
-  color: #aaa3bd;
+  color: #94a3b8;
   padding: 3px;
   display: flex;
   background: transparent;
@@ -110,7 +110,7 @@ html[data-widget], html[data-widget] body {
 
 .widget-refresh:hover {
   background: #ffffff16;
-  color: #f6f4ff;
+  color: #f8fafc;
 }
 
 .widget-refreshing svg {
@@ -151,8 +151,8 @@ html[data-widget], html[data-widget] body {
 }
 
 .widget-model-card.quota-normal {
-  border-color: rgba(185, 165, 250, 0.2);
-  background: rgba(185, 165, 250, 0.04);
+  border-color: color-mix(in srgb, var(--quota-color, #38bdf8) 25%, transparent);
+  background: color-mix(in srgb, var(--quota-color, #38bdf8) 5%, transparent);
 }
 
 .widget-model-card.quota-warning {
@@ -186,7 +186,7 @@ html[data-widget], html[data-widget] body {
   padding: 1px 5px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  color: #c9c5d7;
+  color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -204,7 +204,7 @@ html[data-widget], html[data-widget] body {
 .widget-empty-note {
   padding: 8px;
   font-size: 10px;
-  color: #a49fb5;
+  color: #94a3b8;
   text-align: center;
 }
 
@@ -223,8 +223,8 @@ html[data-widget], html[data-widget] body {
 }
 
 .widget-quota.quota-normal {
-  border-color: rgba(185, 165, 250, 0.2);
-  background: rgba(185, 165, 250, 0.05);
+  border-color: color-mix(in srgb, var(--quota-color, #38bdf8) 25%, transparent);
+  background: color-mix(in srgb, var(--quota-color, #38bdf8) 5%, transparent);
 }
 
 .widget-quota.quota-warning {
@@ -332,7 +332,7 @@ html[data-widget], html[data-widget] body {
   gap: 4px;
   font-size: 10px;
   font-weight: 650;
-  color: #e6defd;
+  color: #f1f5f9;
   padding: 2px 4px;
   background: transparent;
   border: none;
@@ -378,8 +378,8 @@ html[data-widget], html[data-widget] body {
 }
 
 .widget-compact-chip.quota-normal {
-  border-color: rgba(185, 165, 250, 0.22);
-  background: rgba(185, 165, 250, 0.06);
+  border-color: color-mix(in srgb, var(--quota-color, #38bdf8) 28%, transparent);
+  background: color-mix(in srgb, var(--quota-color, #38bdf8) 7%, transparent);
 }
 
 .widget-compact-chip.quota-warning {
@@ -450,7 +450,7 @@ html[data-widget], html[data-widget] body {
   flex: none;
   display: flex;
   align-items: center;
-  color: #aaa3bd;
+  color: #64748b;
   cursor: grab;
   padding: 4px 0;
 }
