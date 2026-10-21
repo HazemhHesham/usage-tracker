@@ -25,6 +25,14 @@ function quotaTone(bucket?: RateLimitBucket) {
   return "normal";
 }
 
+function worstTone(a?: RateLimitBucket, b?: RateLimitBucket) {
+  const toneA = quotaTone(a);
+  const toneB = quotaTone(b);
+  if (toneA === "danger" || toneB === "danger") return "danger";
+  if (toneA === "warning" || toneB === "warning") return "warning";
+  return "normal";
+}
+
 function planLabel(account: unknown): string | null {
   if (!account || typeof account !== "object" || !("planType" in account)) {
     return null;
@@ -37,23 +45,18 @@ function QuotaRow({
   bucket,
   now,
   stale,
-  accent,
 }: {
   label: string;
   bucket?: RateLimitBucket;
   now: number;
   stale: boolean;
-  accent?: string;
 }) {
   const remaining = bucket ? Math.round(bucket.remainingPercent) : undefined;
   const countdown = bucket ? formatCountdown(bucket.resetsAt, now) : "Quota unavailable";
   const resetClock = bucket?.resetsAt ? formatLocalReset(bucket.resetsAt, new Date(now)) : "";
   const tone = quotaTone(bucket);
   return (
-    <div
-      className={`widget-quota quota-${tone}`}
-      style={tone === "normal" && accent ? ({ ["--quota-color"]: accent } as React.CSSProperties) : undefined}
-    >
+    <div className={`widget-quota quota-${tone}`}>
       <div className="widget-quota-header">
         <div className="widget-quota-label-group">
           <span className="widget-window">{label}</span>
@@ -95,7 +98,7 @@ export interface WidgetModelItem {
   provider: ProviderId;
   name: string;
   shortLabel: string;
-  accent: string;
+  accent?: string;
   fiveHourBucket?: RateLimitBucket;
   weeklyBucket?: RateLimitBucket;
   stale: boolean;
@@ -186,7 +189,6 @@ export function CodexWidget() {
           provider: "antigravity",
           name: "Gemini",
           shortLabel: "Gemini",
-          accent: "#3b82f6",
           fiveHourBucket:
             geminiBuckets.find((b) => b.windowDurationMins === 300 || b.limitId.includes("5h")) ??
             geminiBuckets[0],
@@ -207,7 +209,6 @@ export function CodexWidget() {
           provider: "antigravity",
           name: "Claude & GPT",
           shortLabel: "Claude",
-          accent: "#f6d89b",
           fiveHourBucket:
             threePBuckets.find((b) => b.windowDurationMins === 300 || b.limitId.includes("5h")) ??
             threePBuckets[0],
@@ -228,7 +229,6 @@ export function CodexWidget() {
           provider: "antigravity",
           name: "Antigravity",
           shortLabel: "Antigravity",
-          accent: "#3b82f6",
           fiveHourBucket:
             antigravity.buckets.find((b) => b.windowDurationMins === 300) ?? antigravity.buckets[0],
           weeklyBucket: antigravity.buckets.find((b) => b.windowDurationMins === 10_080),
@@ -268,7 +268,6 @@ export function CodexWidget() {
         provider: "codex",
         name: "Codex",
         shortLabel: "Codex",
-        accent: "#10b981",
         fiveHourBucket: fiveHour,
         weeklyBucket: weekly,
         stale,
@@ -302,7 +301,6 @@ export function CodexWidget() {
         provider: "claude",
         name: "Claude Code",
         shortLabel: "Claude",
-        accent: "#f6d89b",
         fiveHourBucket: claude.buckets.find((b) => b.windowDurationMins === 300) ?? claude.buckets[0],
         weeklyBucket: claude.buckets.find((b) => b.windowDurationMins === 10_080),
         stale,
@@ -324,7 +322,6 @@ export function CodexWidget() {
         provider: "opencode",
         name: "OpenCode Go",
         shortLabel: "OpenCode",
-        accent: "#a855f7",
         fiveHourBucket:
           opencode.buckets.find((b) => b.windowDurationMins === 300) ?? opencode.buckets[0],
         weeklyBucket: opencode.buckets.find((b) => b.windowDurationMins === 10_080),
@@ -347,7 +344,6 @@ export function CodexWidget() {
         provider: "cursor",
         name: "Cursor",
         shortLabel: "Cursor",
-        accent: "#00b4d8",
         fiveHourBucket: cursor.buckets[0],
         weeklyBucket: undefined,
         stale,
@@ -369,7 +365,6 @@ export function CodexWidget() {
         provider: "devin",
         name: "Devin",
         shortLabel: "Devin",
-        accent: "#6366f1",
         fiveHourBucket: devin.buckets[0],
         weeklyBucket: devin.buckets.find((b) => b.windowDurationMins === 10_080),
         stale,
@@ -406,7 +401,6 @@ export function CodexWidget() {
         provider: "codex",
         name: "Codex",
         shortLabel: "Codex",
-        accent: "#10b981",
         fiveHourBucket: fiveHour,
         weeklyBucket: weekly,
         stale,
@@ -621,14 +615,10 @@ function formatCompactTime(resetsAt?: number, nowMs = Date.now()): string {
                 <div
                   key={item.id}
                   className={`widget-compact-chip widget-compact-row quota-${tone}`}
-                  style={tone === "normal" && item.accent ? ({ ["--quota-color"]: item.accent } as React.CSSProperties) : undefined}
                   title={tooltip}
                 >
                   {items.length > 1 && (
-                    <span
-                      className="widget-model-name"
-                      style={{ color: item.accent }}
-                    >
+                    <span className="widget-model-name">
                       {item.shortLabel}
                     </span>
                   )}
@@ -754,20 +744,16 @@ function formatCompactTime(resetsAt?: number, nowMs = Date.now()): string {
 
           <div className="widget-expanded-scroll">
             {items.map((item) => {
-              const itemTone = quotaTone(item.fiveHourBucket ?? item.weeklyBucket);
+              const itemTone = worstTone(item.fiveHourBucket, item.weeklyBucket);
               return (
                 <section
                   key={item.id}
                   className={`widget-model-card quota-${itemTone}`}
-                  style={itemTone === "normal" && item.accent ? ({ ["--quota-color"]: item.accent } as React.CSSProperties) : undefined}
                   data-provider={item.provider}
                 >
                   {items.length > 1 && (
                     <div className="widget-model-card-header">
-                      <span
-                        className="widget-card-title"
-                        style={{ color: item.accent }}
-                      >
+                      <span className="widget-card-title">
                         {item.name}
                       </span>
                       {item.plan && <span className="widget-card-plan">{item.plan}</span>}
@@ -783,7 +769,6 @@ function formatCompactTime(resetsAt?: number, nowMs = Date.now()): string {
                     bucket={item.fiveHourBucket}
                     now={now}
                     stale={item.stale}
-                    accent={item.accent}
                   />
                   {(item.weeklyBucket || items.length === 1) && (
                     <QuotaRow
@@ -791,7 +776,6 @@ function formatCompactTime(resetsAt?: number, nowMs = Date.now()): string {
                       bucket={item.weeklyBucket}
                       now={now}
                       stale={item.stale}
-                      accent={item.accent}
                     />
                   )}
                 </section>

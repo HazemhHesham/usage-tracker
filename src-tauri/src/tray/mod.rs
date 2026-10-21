@@ -185,14 +185,7 @@ impl Provider {
     /// into each tool's logo. Distinct on purpose: purple Codex, coral Claude,
     /// teal Cursor, indigo OpenCode, amber Devin, blue Antigravity.
     fn color(self) -> [f64; 3] {
-        match self {
-            Provider::Codex => [140.0, 92.0, 240.0],
-            Provider::Claude => [217.0, 119.0, 87.0],
-            Provider::Cursor => [15.0, 157.0, 142.0],
-            Provider::OpenCode => [79.0, 70.0, 229.0],
-            Provider::Devin => [212.0, 132.0, 38.0],
-            Provider::Antigravity => [66.0, 133.0, 244.0],
-        }
+        [56.0, 189.0, 248.0]
     }
 
     fn from_key(key: &str) -> Option<Self> {
