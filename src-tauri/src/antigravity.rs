@@ -45,6 +45,7 @@ pub struct AntigravityManager {
     client: reqwest::Client,
     refresh_lock: Arc<Mutex<()>>,
     token_cache: Arc<Mutex<Option<CachedAccessToken>>>,
+    last_local_endpoint: Arc<Mutex<Option<LocalEndpoint>>>,
 }
 
 #[derive(Clone)]
@@ -61,11 +62,27 @@ impl AntigravityManager {
             client: http_client(),
             refresh_lock: Arc::new(Mutex::new(())),
             token_cache: Arc::new(Mutex::new(None)),
+            last_local_endpoint: Arc::new(Mutex::new(None)),
         }
     }
 
     pub async fn snapshot(&self) -> ProviderState {
         self.state.read().await.clone()
+    }
+
+    pub async fn should_poll_local_launch(&self) -> bool {
+        if !self
+            .app
+            .state::<crate::prefs::PrefsStore>()
+            .get()
+            .is_visible(crate::prefs::PROVIDER_ANTIGRAVITY)
+        {
+            return false;
+        }
+        let Some(newest) = newest_logged_endpoint() else {
+            return false;
+        };
+        self.last_local_endpoint.lock().await.as_ref() != Some(&newest)
     }
 
     pub async fn refresh(&self) -> Result<ProviderState, String> {
@@ -91,6 +108,7 @@ impl AntigravityManager {
         }
 
         let _guard = self.refresh_lock.lock().await;
+        *self.last_local_endpoint.lock().await = newest_logged_endpoint();
         if let Some(local) = fetch_local_usage().await {
             self.publish(&local.plan, local.payload).await?;
             return Ok(self.snapshot().await);
@@ -271,22 +289,38 @@ struct LocalUsage {
     payload: Value,
 }
 
-/// Asks a running Antigravity app, IDE, or `agy` session for quota. The app
-/// login never leaves the machine: the language server is already signed in.
+/// Asks a running Antigravity app, IDE, VS Code extension, or `agy` session
+/// for quota. The app login never leaves the machine: the language server is
+/// already signed in.
 async fn fetch_local_usage() -> Option<LocalUsage> {
     let client = local_http_client();
-    for endpoint in local_server_endpoints() {
-        let csrf = match endpoint.csrf {
-            Some(token) => Some(token),
-            None => fetch_local_csrf(&client, &endpoint.base).await,
+    let logged = logged_endpoints();
+    if let Some(usage) = probe_endpoints(&client, &logged).await {
+        return Some(usage);
+    }
+    let fallback: Vec<_> = local_server_endpoints()
+        .into_iter()
+        .filter(|endpoint| !logged.contains(endpoint))
+        .collect();
+    probe_endpoints(&client, &fallback).await
+}
+
+async fn probe_endpoints(
+    client: &reqwest::Client,
+    endpoints: &[LocalEndpoint],
+) -> Option<LocalUsage> {
+    for endpoint in endpoints {
+        let csrf = match &endpoint.csrf {
+            Some(token) => Some(token.clone()),
+            None => fetch_local_csrf(client, &endpoint.base).await,
         };
         let Some(status) =
-            post_local_rpc(&client, &endpoint.base, csrf.as_deref(), LOCAL_STATUS_RPC).await
+            post_local_rpc(client, &endpoint.base, csrf.as_deref(), LOCAL_STATUS_RPC).await
         else {
             continue;
         };
         let Some(quota) =
-            post_local_rpc(&client, &endpoint.base, csrf.as_deref(), LOCAL_QUOTA_RPC).await
+            post_local_rpc(client, &endpoint.base, csrf.as_deref(), LOCAL_QUOTA_RPC).await
         else {
             continue;
         };
@@ -306,6 +340,7 @@ async fn fetch_local_usage() -> Option<LocalUsage> {
 /// local Antigravity process; the normal Cloud Code client still validates TLS.
 fn local_http_client() -> reqwest::Client {
     reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_millis(250))
         .timeout(std::time::Duration::from_secs(3))
         .user_agent(concat!("usagebar/", env!("CARGO_PKG_VERSION")))
         .danger_accept_invalid_certs(true)
@@ -366,6 +401,20 @@ fn plan_from_status(value: &Value) -> String {
 }
 
 #[cfg(not(target_os = "windows"))]
+fn logged_endpoints() -> Vec<LocalEndpoint> {
+    Vec::new()
+}
+
+#[cfg(target_os = "windows")]
+fn logged_endpoints() -> Vec<LocalEndpoint> {
+    windows_logged_endpoints()
+}
+
+fn newest_logged_endpoint() -> Option<LocalEndpoint> {
+    logged_endpoints().into_iter().next()
+}
+
+#[cfg(not(target_os = "windows"))]
 fn local_server_endpoints() -> Vec<LocalEndpoint> {
     let Ok(output) = std::process::Command::new("lsof")
         .args(["-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcn"])
@@ -385,12 +434,13 @@ fn local_server_endpoints() -> Vec<LocalEndpoint> {
 #[cfg(target_os = "windows")]
 fn local_server_endpoints() -> Vec<LocalEndpoint> {
     let ports = windows_listener_ports();
-    let mut endpoints = windows_logged_endpoints();
+    let mut endpoints = Vec::new();
 
     // Keep compatibility with the standalone app and older IDE builds that
-    // expose the token from their loopback root. Newer IDE builds are handled
-    // above from their own private launch log. HTTPS is tried before HTTP
-    // because Antigravity labels its primary RPC listener as HTTPS.
+    // expose the token from their loopback root. Newer IDE and VS Code
+    // extension builds are handled above from their private launch logs. HTTPS
+    // is tried before HTTP because Antigravity labels its primary RPC listener
+    // as HTTPS.
     for port in ports {
         for scheme in ["https", "http"] {
             let endpoint = LocalEndpoint {
@@ -427,26 +477,17 @@ fn windows_listener_ports() -> Vec<u16> {
         .collect()
 }
 
-/// Antigravity IDE 2.5+ protects both local RPC listeners with a CSRF token.
-/// The extension records that token and the paired HTTP port in its private
-/// per-session launch log. Reading this is equivalent to reading the token
-/// from the old loopback landing page, and it never leaves this process.
+/// Antigravity IDE 2.5+ and the VS Code Antigravity extension protect local
+/// RPC listeners with a CSRF token. Both record that token and the paired HTTP
+/// port in their private per-session launch logs under `%APPDATA%`. Reading
+/// these is equivalent to reading the token from the old loopback landing
+/// page, and it never leaves this process.
 #[cfg(target_os = "windows")]
 fn windows_logged_endpoints() -> Vec<LocalEndpoint> {
     let Some(app_data) = std::env::var_os("APPDATA") else {
         return Vec::new();
     };
-    let logs = std::path::PathBuf::from(app_data)
-        .join("Antigravity IDE")
-        .join("logs");
-    let Ok(sessions) = std::fs::read_dir(logs) else {
-        return Vec::new();
-    };
-    let mut logs: Vec<_> = sessions
-        .filter_map(Result::ok)
-        .map(|entry| entry.path().join("ls-main.log"))
-        .filter(|path| path.is_file())
-        .collect();
+    let mut logs = collect_windows_launch_logs(std::path::Path::new(&app_data));
     logs.sort_by_key(|path| {
         std::fs::metadata(path)
             .and_then(|metadata| metadata.modified())
@@ -454,38 +495,129 @@ fn windows_logged_endpoints() -> Vec<LocalEndpoint> {
     });
     logs.reverse();
 
-    logs.into_iter()
-        .take(8)
-        .filter_map(|path| std::fs::read_to_string(path).ok())
-        .filter_map(|text| parse_language_server_log(&text))
-        .collect()
+    let mut endpoints = Vec::new();
+    for path in logs.into_iter().take(12) {
+        let Ok(text) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        let Some(endpoint) = parse_language_server_log(&text) else {
+            continue;
+        };
+        if !endpoints.contains(&endpoint) {
+            endpoints.push(endpoint);
+        }
+    }
+    endpoints
+}
+
+fn collect_windows_launch_logs(app_data: &std::path::Path) -> Vec<std::path::PathBuf> {
+    const HOSTS: [&str; 5] = [
+        "Antigravity IDE",
+        "Code",
+        "Code - Insiders",
+        "Cursor",
+        "VSCodium",
+    ];
+    let mut logs = Vec::new();
+    for host in HOSTS {
+        let Ok(sessions) = std::fs::read_dir(app_data.join(host).join("logs")) else {
+            continue;
+        };
+        for session in sessions.filter_map(Result::ok) {
+            let session_path = session.path();
+            let ls_main = session_path.join("ls-main.log");
+            if ls_main.is_file() {
+                logs.push(ls_main);
+            }
+            let Ok(entries) = std::fs::read_dir(&session_path) else {
+                continue;
+            };
+            for window in entries.filter_map(Result::ok) {
+                if !window.file_name().to_string_lossy().starts_with("window") {
+                    continue;
+                }
+                let Ok(exthost_entries) = std::fs::read_dir(window.path().join("exthost")) else {
+                    continue;
+                };
+                for output_dir in exthost_entries.filter_map(Result::ok) {
+                    let dir_name = output_dir.file_name();
+                    let dir_name = dir_name.to_string_lossy();
+                    if !dir_name.starts_with("output_logging_") && !dir_name.starts_with("google.")
+                    {
+                        continue;
+                    }
+                    let Ok(files) = std::fs::read_dir(output_dir.path()) else {
+                        continue;
+                    };
+                    for file in files.filter_map(Result::ok) {
+                        let path = file.path();
+                        if is_antigravity_extension_log(&path) && path.is_file() {
+                            logs.push(path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    logs
+}
+
+fn is_antigravity_extension_log(path: &std::path::Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    let lower = name.to_ascii_lowercase();
+    lower == "antigravity.log" || lower.ends_with("-antigravity.log")
 }
 
 fn parse_language_server_log(text: &str) -> Option<LocalEndpoint> {
-    let csrf = text.lines().rev().find_map(|line| {
-        let mut words = line.split_whitespace();
-        while let Some(word) = words.next() {
-            if word == "--csrf_token" {
-                return words
-                    .next()
-                    .filter(|token| !token.is_empty())
-                    .map(str::to_owned);
-            }
-        }
-        None
-    })?;
-    let port = text.lines().rev().find_map(|line| {
-        let prefix = "listening on random port at ";
-        let (_, rest) = line.split_once(prefix)?;
-        if !rest.contains(" for HTTP") || rest.contains(" for HTTPS") {
-            return None;
-        }
-        rest.split_whitespace().next()?.parse::<u16>().ok()
-    })?;
+    let csrf = text.lines().rev().find_map(parse_log_csrf)?;
+    let port = text.lines().rev().find_map(parse_log_http_port)?;
     Some(LocalEndpoint {
         base: format!("http://127.0.0.1:{port}"),
         csrf: Some(csrf),
     })
+}
+
+fn parse_log_csrf(line: &str) -> Option<String> {
+    let mut words = line.split_whitespace();
+    while let Some(word) = words.next() {
+        if word == "--csrf_token" {
+            return words
+                .next()
+                .filter(|token| !token.is_empty())
+                .map(str::to_owned);
+        }
+        if let Some(token) = word.strip_prefix("--csrf_token=") {
+            if !token.is_empty() {
+                return Some(token.to_owned());
+            }
+        }
+    }
+    None
+}
+
+fn parse_log_http_port(line: &str) -> Option<u16> {
+    if let Some((_, rest)) = line.split_once("listening on random port at ") {
+        if rest.contains(" for HTTP") && !rest.contains(" for HTTPS") {
+            return rest.split_whitespace().next()?.parse::<u16>().ok();
+        }
+    }
+    if let Some((_, rest)) = line.split_once("Server at http://127.0.0.1:") {
+        if rest.contains(" is READY") {
+            return rest.split_whitespace().next()?.parse::<u16>().ok();
+        }
+    }
+    let mut words = line.split_whitespace();
+    while let Some(word) = words.next() {
+        if word == "--hub-port" {
+            return words.next()?.parse::<u16>().ok();
+        }
+        if let Some(port) = word.strip_prefix("--hub-port=") {
+            return port.parse::<u16>().ok();
+        }
+    }
+    None
 }
 
 fn parse_lsof_bases(output: &str) -> Vec<String> {
@@ -1293,6 +1425,46 @@ server.go:569] Language server listening on random port at 53573 for HTTP
                 csrf: Some("secret-value".to_owned()),
             })
         );
+    }
+
+    #[test]
+    fn reads_the_hub_port_and_csrf_from_a_vscode_extension_log() {
+        let log = r#"
+[INSTALL] Installed binary is valid (actual version 1.4.5 >= target 1.4.5). Skipping download.
+[LAUNCH] Spawning C:\Users\Asus\.gemini\bin\agy.exe (v1.4.5) --hub --hub-port=54551 --app_data_dir=antigravity --csrf_token=9e14ea38-658b-4c1d-bd00-a0be303eadea --add-dir=d:\VS Code\AI_Usage_Meter
+[LAUNCH] Server at http://127.0.0.1:54551 is READY after 3 attempt(s).
+"#;
+        assert_eq!(
+            parse_language_server_log(log),
+            Some(LocalEndpoint {
+                base: "http://127.0.0.1:54551".to_owned(),
+                csrf: Some("9e14ea38-658b-4c1d-bd00-a0be303eadea".to_owned()),
+            })
+        );
+    }
+
+    #[test]
+    fn collects_launch_logs_from_vscode_and_antigravity_ide() {
+        let temp =
+            std::env::temp_dir().join(format!("usagebar-antigravity-logs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp);
+        let ide_dir = temp.join("Antigravity IDE/logs/20261022T100000");
+        let vscode_dir =
+            temp.join("Code/logs/20261022T104121/window1/exthost/output_logging_20261022T105348");
+        std::fs::create_dir_all(&ide_dir).expect("ide dir");
+        std::fs::create_dir_all(&vscode_dir).expect("vscode dir");
+        let ide_log = ide_dir.join("ls-main.log");
+        let vscode_log = vscode_dir.join("2-Antigravity.log");
+        let ignored_log = vscode_dir.join("1-Antigravity LS.log");
+        std::fs::write(&ide_log, "ide").expect("write ide");
+        std::fs::write(&vscode_log, "vscode").expect("write vscode");
+        std::fs::write(&ignored_log, "ignored").expect("write ignored");
+
+        let found = collect_windows_launch_logs(&temp);
+        assert!(found.contains(&ide_log));
+        assert!(found.contains(&vscode_log));
+        assert!(!found.contains(&ignored_log));
+        let _ = std::fs::remove_dir_all(&temp);
     }
 
     #[test]

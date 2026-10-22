@@ -435,7 +435,7 @@ pub fn run() {
             });
             let antigravity_refresher = antigravity_manager.clone();
             tauri::async_runtime::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
                 interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                 let mut last_attempt = now_unix_seconds();
                 let mut failures: u32 = 1;
@@ -443,17 +443,23 @@ pub fn run() {
                     interval.tick().await;
                     let now = now_unix_seconds();
                     let before = antigravity_refresher.snapshot().await.updated_at;
-                    if !should_refresh(now, before, last_attempt, failures) {
+                    let new_local_launch = antigravity_refresher.should_poll_local_launch().await;
+                    if !new_local_launch && !should_refresh(now, before, last_attempt, failures) {
                         continue;
                     }
                     last_attempt = now;
                     let _ = antigravity_refresher.refresh().await;
                     let after = antigravity_refresher.snapshot().await.updated_at;
-                    failures = if after == before {
-                        failures.saturating_add(1)
+                    if after == before {
+                        if new_local_launch {
+                            failures = 1;
+                            last_attempt = now.saturating_sub(FIRST_RETRY_SECS.saturating_sub(5));
+                        } else {
+                            failures = failures.saturating_add(1);
+                        }
                     } else {
-                        0
-                    };
+                        failures = 0;
+                    }
                 }
             });
             Ok(())
