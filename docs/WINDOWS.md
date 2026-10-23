@@ -1,7 +1,6 @@
 # UsageBar on Windows
 
-This repository originally targets macOS, rather than iOS. The Windows port
-reuses the React dashboard and Tauri backend, with a Windows notification-area
+UsageBar started as a macOS menu-bar app. The Windows build reuses the React dashboard and Tauri backend, with a Windows notification-area
 icon, native login-file paths, and an NSIS `.exe` installer. It is intended for
 Windows 10/11 x64 with WebView2.
 
@@ -50,6 +49,7 @@ At least one provider must have a supported local login to show real usage.
 | OpenCode Go | `%USERPROFILE%\.local\share\opencode\auth.json`, or `%XDG_DATA_HOME%\opencode\auth.json`. Requires a Go login, rather than a Zen entry. |
 | Devin CLI | `%USERPROFILE%\.local\share\devin\credentials.toml`, or `%XDG_DATA_HOME%\devin\credentials.toml`. Requires a CLI that writes this supported format. |
 | Antigravity | Keep the signed-in Windows app or IDE running. UsageBar discovers its loopback listener and, for newer IDE builds, reads the short-lived local CSRF token from Antigravity's own session log. A still-valid token in `%USERPROFILE%\.gemini\antigravity-cli\antigravity-oauth-token` is also supported. |
+| Gemini CLI | `%USERPROFILE%\.gemini\oauth_creds.json`. Sign in with Google in the Gemini CLI; API-key and Vertex AI auth have no quota to read. |
 
 Windows home directories use `USERPROFILE`, with `HOME` as a fallback.
 macOS Keychain integration is skipped on Windows. Tools installed and signed in
