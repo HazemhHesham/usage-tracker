@@ -511,6 +511,7 @@ fn windows_logged_endpoints() -> Vec<LocalEndpoint> {
     endpoints
 }
 
+#[cfg(any(target_os = "windows", test))]
 fn collect_windows_launch_logs(app_data: &std::path::Path) -> Vec<std::path::PathBuf> {
     const HOSTS: [&str; 5] = [
         "Antigravity IDE",
@@ -563,6 +564,7 @@ fn collect_windows_launch_logs(app_data: &std::path::Path) -> Vec<std::path::Pat
     logs
 }
 
+#[cfg(any(target_os = "windows", test))]
 fn is_antigravity_extension_log(path: &std::path::Path) -> bool {
     let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
         return false;
@@ -571,6 +573,7 @@ fn is_antigravity_extension_log(path: &std::path::Path) -> bool {
     lower == "antigravity.log" || lower.ends_with("-antigravity.log")
 }
 
+#[cfg(any(target_os = "windows", test))]
 fn parse_language_server_log(text: &str) -> Option<LocalEndpoint> {
     let csrf = text.lines().rev().find_map(parse_log_csrf)?;
     let port = text.lines().rev().find_map(parse_log_http_port)?;
@@ -580,6 +583,7 @@ fn parse_language_server_log(text: &str) -> Option<LocalEndpoint> {
     })
 }
 
+#[cfg(any(target_os = "windows", test))]
 fn parse_log_csrf(line: &str) -> Option<String> {
     let mut words = line.split_whitespace();
     while let Some(word) = words.next() {
@@ -598,6 +602,7 @@ fn parse_log_csrf(line: &str) -> Option<String> {
     None
 }
 
+#[cfg(any(target_os = "windows", test))]
 fn parse_log_http_port(line: &str) -> Option<u16> {
     if let Some((_, rest)) = line.split_once("listening on random port at ") {
         if rest.contains(" for HTTP") && !rest.contains(" for HTTPS") {

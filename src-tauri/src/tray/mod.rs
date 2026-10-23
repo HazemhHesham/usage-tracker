@@ -385,8 +385,13 @@ fn build_unified_menu(
     let updates = update_menu_item(app)?;
     let walkthrough =
         MenuItem::with_id(app, "show-onboarding", "Setup Guide…", true, None::<&str>)?;
-    let star =
-        MenuItem::with_id(app, "star-github", "Star UsageBar on GitHub", true, None::<&str>)?;
+    let star = MenuItem::with_id(
+        app,
+        "star-github",
+        "Star UsageBar on GitHub",
+        true,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, "quit-app", "Quit UsageBar", true, None::<&str>)?;
 
     use tauri::menu::IsMenuItem;
@@ -459,9 +464,15 @@ fn build_provider_menu(
     let updates = update_menu_item(app)?;
     let walkthrough =
         MenuItem::with_id(app, "show-onboarding", "Setup Guide…", true, None::<&str>)?;
-    let star =
-        MenuItem::with_id(app, "star-github", "Star UsageBar on GitHub", true, None::<&str>)?;
+    let star = MenuItem::with_id(
+        app,
+        "star-github",
+        "Star UsageBar on GitHub",
+        true,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, "quit-app", "Quit UsageBar", true, None::<&str>)?;
+    #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
     let mut items: Vec<&dyn IsMenuItem<tauri::Wry>> = vec![
         &refresh,
         &sep_after_refresh,
@@ -996,8 +1007,9 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
             tauri::process::restart(&app.env());
         }
         "star-github" => {
-            let _ =
-                crate::commands::open_in_browser("https://github.com/abdelrahmanmagdii/usage-tracker");
+            let _ = crate::commands::open_in_browser(
+                "https://github.com/abdelrahmanmagdii/usage-tracker",
+            );
         }
         "show-onboarding" => {
             if let Some(window) = app.get_webview_window("main") {

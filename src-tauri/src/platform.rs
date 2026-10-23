@@ -111,11 +111,6 @@ pub fn position_codex_widget(app: &tauri::AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-#[cfg(not(target_os = "windows"))]
-pub fn position_codex_widget(_app: &tauri::AppHandle) -> tauri::Result<()> {
-    Ok(())
-}
-
 /// Native Windows tools store their dot-directories under USERPROFILE.
 pub fn home_dir() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]

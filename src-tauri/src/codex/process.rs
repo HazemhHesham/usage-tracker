@@ -394,6 +394,7 @@ enum CodexExecutable {
 }
 
 async fn find_codex_cli() -> Result<CodexExecutable, String> {
+    #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
     let mut candidates = vec![
         std::env::var_os("USAGEBAR_CODEX_PATH").map(PathBuf::from),
         which::which("codex").ok(),
