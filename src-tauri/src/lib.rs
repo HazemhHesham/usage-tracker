@@ -213,10 +213,22 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             {
                 if let Some(widget) = app.get_webview_window("codex-widget") {
-                    widget.set_size(tauri::LogicalSize::new(328.0, 26.0))?;
-                    platform::position_codex_widget(app.handle())?;
-                    widget.show()?;
+                    let _ = widget.set_always_on_top(true);
+                    let _ = widget.set_size(tauri::LogicalSize::new(328.0, 26.0));
+                    let _ = widget.show();
+                    let _ = widget.unminimize();
+                    let _ = platform::position_codex_widget(app.handle());
                 }
+
+                // Windows shell/taskbar may still be initializing work area at boot.
+                // Re-dock periodically over the first few seconds so it doesn't get buried.
+                let startup_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    for delay_ms in [300, 800, 1500, 3000, 5000, 8000] {
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+                        let _ = platform::position_codex_widget(&startup_handle);
+                    }
+                });
             }
             updates::spawn_periodic_checks(&app.handle());
 

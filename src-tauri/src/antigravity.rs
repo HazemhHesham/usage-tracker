@@ -1027,6 +1027,12 @@ fn classify_group(group: &Value) -> GroupMeta {
         .and_then(Value::as_str)
         .unwrap_or_default();
     let haystack = format!("{bucket_hint} {display}").to_ascii_lowercase();
+    if haystack.contains("argon") {
+        return GroupMeta {
+            id: "argon".into(),
+            name: "Gemini 4 Argon".into(),
+        };
+    }
     if haystack.contains("gemini") {
         return GroupMeta {
             id: "gemini".into(),
@@ -1250,6 +1256,17 @@ mod tests {
                             "remainingFraction": 1.0
                         }
                     ]
+                },
+                {
+                    "displayName": "Gemini 4 Argon",
+                    "buckets": [
+                        {
+                            "bucketId": "gemini-argon-wtu-weekly",
+                            "displayName": "Gemini 4 Argon Weekly Limit",
+                            "window": "weekly",
+                            "remainingFraction": 0.9
+                        }
+                    ]
                 }
             ]
         });
@@ -1259,7 +1276,7 @@ mod tests {
             .get("rateLimitsByLimitId")
             .and_then(Value::as_object)
             .expect("map");
-        assert_eq!(by_id.len(), 4);
+        assert_eq!(by_id.len(), 5);
         let gemini_5h = by_id["gemini-5h"]
             .pointer("/primary/usedPercent")
             .and_then(Value::as_f64)
@@ -1286,6 +1303,15 @@ mod tests {
             by_id["3p-weekly"].get("limitName"),
             Some(&json!("Claude and GPT"))
         );
+        let argon_weekly = by_id["argon-weekly"]
+            .pointer("/secondary/usedPercent")
+            .and_then(Value::as_f64)
+            .expect("argon weekly");
+        assert!((argon_weekly - 10.0).abs() < 0.05);
+        assert_eq!(
+            by_id["argon-weekly"].get("limitName"),
+            Some(&json!("Gemini 4 Argon"))
+        );
         let windows = crate::tray::collect_windows(Some(&normalized.rate_limits));
         let labels: Vec<&str> = windows.iter().map(|window| window.label.as_str()).collect();
         assert_eq!(
@@ -1294,6 +1320,7 @@ mod tests {
                 "Claude and GPT 5-hour",
                 "Gemini 5-hour",
                 "Claude and GPT weekly",
+                "Gemini 4 Argon weekly",
                 "Gemini weekly"
             ]
         );

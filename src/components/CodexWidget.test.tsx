@@ -224,21 +224,27 @@ it("turns yellow at 35% remaining and red at 20% remaining", () => {
   expect(screen.getByText("35%").closest(".widget-compact-chip")?.classList.contains("quota-warning")).toBe(true);
 });
 
-it("supports multiple LLM models side-by-side with 5-hour usage", () => {
+it("supports multiple LLM models side-by-side with 5-hour and Argon 4 weekly usage", () => {
   otherMeters.antigravity.state = { connection: "connected", updatedAt: now / 1000 };
   otherMeters.antigravity.buckets = extractRateLimitBuckets({
     rateLimitsByLimitId: {
       "gemini-5h": { primary: { usedPercent: 2, windowDurationMins: 300, resetsAt: now / 1000 + 3600 } },
+      "argon-weekly": {
+        limitName: "Gemini 4 Argon",
+        secondary: { usedPercent: 6, windowDurationMins: 10080, resetsAt: now / 1000 + 6 * 86400 },
+      },
       "3p-5h": { primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: now / 1000 + 5400 } },
     },
   });
   render(<CodexWidget />);
   expect(screen.getByText("Codex")).toBeTruthy();
   expect(screen.getByText("Gemini")).toBeTruthy();
+  expect(screen.getByText("Argon 4")).toBeTruthy();
   expect(screen.getByText("Claude")).toBeTruthy();
   expect(screen.getByText("82%")).toBeTruthy();
   expect(screen.getByText("98%")).toBeTruthy();
+  expect(screen.getByText("94%")).toBeTruthy();
   expect(screen.getByText("60%")).toBeTruthy();
-  // Weekly limits remain hidden in collapsed mode to prevent chunkiness
+  // Weekly limits remain hidden in collapsed mode when a 5h limit is present
   expect(screen.queryByText("64%")).toBeNull();
 });

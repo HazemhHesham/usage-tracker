@@ -94,21 +94,19 @@ pub fn position_codex_widget(app: &tauri::AppHandle) -> tauri::Result<()> {
         (right_x, bottom_y)
     };
 
-    if window_rect.left != target_x || window_rect.top != target_y {
-        const SWP_NOSIZE: u32 = 0x0001;
-        const SWP_NOZORDER: u32 = 0x0004;
-        const SWP_NOACTIVATE: u32 = 0x0010;
-        unsafe {
-            SetWindowPos(
-                raw_hwnd,
-                std::ptr::null_mut(),
-                target_x,
-                target_y,
-                0,
-                0,
-                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
-            );
-        }
+    const HWND_TOPMOST: *mut std::ffi::c_void = -1isize as *mut std::ffi::c_void;
+    const SWP_NOSIZE: u32 = 0x0001;
+    const SWP_NOACTIVATE: u32 = 0x0010;
+    unsafe {
+        SetWindowPos(
+            raw_hwnd,
+            HWND_TOPMOST,
+            target_x,
+            target_y,
+            0,
+            0,
+            SWP_NOSIZE | SWP_NOACTIVATE,
+        );
     }
     Ok(())
 }

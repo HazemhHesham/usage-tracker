@@ -405,6 +405,7 @@ pub fn reset_widget_position(app: AppHandle) -> Result<(), String> {
 
 pub fn show_codex_widget(app: &AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("codex-widget") {
+        let _ = window.set_always_on_top(true);
         window.show().map_err(|error| error.to_string())?;
         let _ = window.unminimize();
     }

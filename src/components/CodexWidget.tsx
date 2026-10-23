@@ -173,8 +173,14 @@ export function CodexWidget() {
                 : "Reconnecting…";
       const plan = planLabel(antigravity.state.account);
 
+      const argonBuckets = antigravity.buckets.filter(
+        (b) => b.id.includes("argon") || b.limitName?.toLowerCase().includes("argon"),
+      );
       const geminiBuckets = antigravity.buckets.filter(
-        (b) => b.id.includes("gemini") || b.limitName?.toLowerCase().includes("gemini"),
+        (b) =>
+          !b.id.includes("argon") &&
+          !b.limitName?.toLowerCase().includes("argon") &&
+          (b.id.includes("gemini") || b.limitName?.toLowerCase().includes("gemini")),
       );
       const threePBuckets = antigravity.buckets.filter(
         (b) =>
@@ -184,17 +190,41 @@ export function CodexWidget() {
       );
 
       if (geminiBuckets.length > 0) {
+        const fiveHour = geminiBuckets.find(
+          (b) => b.windowDurationMins === 300 || b.limitId.includes("5h"),
+        );
+        const weekly = geminiBuckets.find(
+          (b) => b.windowDurationMins === 10_080 || b.limitId.includes("weekly"),
+        );
         list.push({
           id: "antigravity-gemini",
           provider: "antigravity",
           name: "Gemini",
           shortLabel: "Gemini",
-          fiveHourBucket:
-            geminiBuckets.find((b) => b.windowDurationMins === 300 || b.limitId.includes("5h")) ??
-            geminiBuckets[0],
-          weeklyBucket: geminiBuckets.find(
-            (b) => b.windowDurationMins === 10_080 || b.limitId.includes("weekly"),
-          ),
+          fiveHourBucket: fiveHour ?? (weekly ? undefined : geminiBuckets[0]),
+          weeklyBucket: weekly,
+          stale,
+          status,
+          plan,
+          state: antigravity.state,
+          refresh: antigravity.refresh,
+        });
+      }
+
+      if (argonBuckets.length > 0) {
+        const fiveHour = argonBuckets.find(
+          (b) => b.windowDurationMins === 300 || b.limitId.includes("5h"),
+        );
+        const weekly = argonBuckets.find(
+          (b) => b.windowDurationMins === 10_080 || b.limitId.includes("weekly"),
+        );
+        list.push({
+          id: "antigravity-argon",
+          provider: "antigravity",
+          name: "Gemini 4 Argon",
+          shortLabel: "Argon 4",
+          fiveHourBucket: fiveHour ?? (weekly ? undefined : argonBuckets[0]),
+          weeklyBucket: weekly,
           stale,
           status,
           plan,
@@ -204,17 +234,19 @@ export function CodexWidget() {
       }
 
       if (threePBuckets.length > 0) {
+        const fiveHour = threePBuckets.find(
+          (b) => b.windowDurationMins === 300 || b.limitId.includes("5h"),
+        );
+        const weekly = threePBuckets.find(
+          (b) => b.windowDurationMins === 10_080 || b.limitId.includes("weekly"),
+        );
         list.push({
           id: "antigravity-3p",
           provider: "antigravity",
           name: "Claude & GPT",
           shortLabel: "Claude",
-          fiveHourBucket:
-            threePBuckets.find((b) => b.windowDurationMins === 300 || b.limitId.includes("5h")) ??
-            threePBuckets[0],
-          weeklyBucket: threePBuckets.find(
-            (b) => b.windowDurationMins === 10_080 || b.limitId.includes("weekly"),
-          ),
+          fiveHourBucket: fiveHour ?? (weekly ? undefined : threePBuckets[0]),
+          weeklyBucket: weekly,
           stale,
           status,
           plan,
@@ -223,7 +255,12 @@ export function CodexWidget() {
         });
       }
 
-      if (geminiBuckets.length === 0 && threePBuckets.length === 0 && antigravity.buckets.length > 0) {
+      if (
+        geminiBuckets.length === 0 &&
+        argonBuckets.length === 0 &&
+        threePBuckets.length === 0 &&
+        antigravity.buckets.length > 0
+      ) {
         list.push({
           id: "antigravity",
           provider: "antigravity",
@@ -468,7 +505,7 @@ function formatCompactTime(resetsAt?: number, nowMs = Date.now()): string {
   const estimatedCollapsedWidth = useMemo(() => {
     const count = items.length;
     if (count <= 1) return 188;
-    return Math.min(520, 34 + count * 106 + 18);
+    return Math.min(640, 34 + count * 106 + 18);
   }, [items.length]);
 
   useEffect(() => {
@@ -500,7 +537,9 @@ function formatCompactTime(resetsAt?: number, nowMs = Date.now()): string {
 
   const expandedHeight = useMemo(() => {
     const cardHeights = items.reduce((acc, it) => {
-      const rows = it.weeklyBucket || items.length === 1 ? 2 : 1;
+      const hasFiveHourRow = Boolean(it.fiveHourBucket || !it.weeklyBucket);
+      const hasWeeklyRow = Boolean(it.weeklyBucket || items.length === 1);
+      const rows = (hasFiveHourRow ? 1 : 0) + (hasWeeklyRow ? 1 : 0);
       return acc + (items.length > 1 ? 24 : 0) + rows * 42 + 10;
     }, 0);
     return Math.min(460, Math.max(130, 36 + cardHeights + 8));
@@ -603,12 +642,13 @@ function formatCompactTime(resetsAt?: number, nowMs = Date.now()): string {
           </button>
           <div className="widget-compact-quotas" ref={quotasRef}>
             {items.map((item) => {
-              const bucket = item.fiveHourBucket;
+              const bucket = item.fiveHourBucket ?? item.weeklyBucket;
+              const windowLabel = item.fiveHourBucket || !item.weeklyBucket ? "5h" : "7d";
               const remaining = bucket ? Math.round(bucket.remainingPercent) : undefined;
               const tone = quotaTone(bucket);
               const countdown = bucket?.resetsAt ? formatCountdown(bucket.resetsAt, now) : "";
               const tooltip = bucket?.resetsAt
-                ? `${item.name} · 5h: ${remaining}% remaining · ${countdown} (${formatLocalReset(bucket.resetsAt, new Date(now))})`
+                ? `${item.name} · ${windowLabel}: ${remaining}% remaining · ${countdown} (${formatLocalReset(bucket.resetsAt, new Date(now))})`
                 : `${item.name}: ${item.status}`;
 
               return (
@@ -623,7 +663,7 @@ function formatCompactTime(resetsAt?: number, nowMs = Date.now()): string {
                     </span>
                   )}
                   {items.length === 1 && (
-                    <span className="widget-window-tag">5h</span>
+                    <span className="widget-window-tag">{windowLabel}</span>
                   )}
                   <strong className="widget-model-percent">
                     {remaining === undefined ? "—" : `${item.stale ? "~" : ""}${remaining}%`}
@@ -639,8 +679,8 @@ function formatCompactTime(resetsAt?: number, nowMs = Date.now()): string {
                       role="meter"
                       aria-label={
                         items.length === 1
-                          ? "5-hour quota remaining"
-                          : `${item.shortLabel} 5-hour quota remaining`
+                          ? `${windowLabel === "7d" ? "Weekly" : "5-hour"} quota remaining`
+                          : `${item.shortLabel} ${windowLabel === "7d" ? "weekly" : "5-hour"} quota remaining`
                       }
                       aria-valuemin={0}
                       aria-valuemax={100}
@@ -764,12 +804,14 @@ function formatCompactTime(resetsAt?: number, nowMs = Date.now()): string {
                       </span>
                     </div>
                   )}
-                  <QuotaRow
-                    label="5h"
-                    bucket={item.fiveHourBucket}
-                    now={now}
-                    stale={item.stale}
-                  />
+                  {(item.fiveHourBucket || !item.weeklyBucket) && (
+                    <QuotaRow
+                      label="5h"
+                      bucket={item.fiveHourBucket}
+                      now={now}
+                      stale={item.stale}
+                    />
+                  )}
                   {(item.weeklyBucket || items.length === 1) && (
                     <QuotaRow
                       label="Weekly"
