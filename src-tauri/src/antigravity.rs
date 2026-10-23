@@ -338,12 +338,13 @@ async fn probe_endpoints(
 /// Antigravity's gRPC listener uses a short-lived self-signed certificate.
 /// This client is used only with hard-coded loopback hosts discovered from a
 /// local Antigravity process; the normal Cloud Code client still validates TLS.
+/// Only the Windows probe tries HTTPS listeners, so macOS keeps validation on.
 fn local_http_client() -> reqwest::Client {
     reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_millis(250))
         .timeout(std::time::Duration::from_secs(3))
         .user_agent(concat!("usagebar/", env!("CARGO_PKG_VERSION")))
-        .danger_accept_invalid_certs(true)
+        .danger_accept_invalid_certs(cfg!(target_os = "windows"))
         .no_proxy()
         .build()
         .expect("local reqwest client construction is infallible with these options")

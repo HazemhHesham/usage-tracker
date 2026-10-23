@@ -1380,10 +1380,17 @@ mod tests {
         ]);
         let rgba = icon.rgba();
         let pixel_at = |x: usize, y: usize| &rgba[(y * 20 + x) * 4..(y * 20 + x) * 4 + 4];
-        let bar1 = pixel_at(3, 10);
-        assert!(bar1[3] > 200);
-        assert_eq!(bar1[0], 56);
-        assert_eq!(bar1[1], 189);
-        assert_eq!(bar1[2], 248);
+        let purple = pixel_at(3, 10);
+        assert!(purple[3] > 200);
+        assert!(purple[2] > purple[1] && purple[0] > purple[1]);
+        let coral = pixel_at(8, 12);
+        assert!(coral[3] > 200);
+        assert!(coral[0] > coral[1] && coral[1] > coral[2]);
+        let teal = pixel_at(12, 12);
+        assert!(teal[3] > 200);
+        assert!(teal[1] > teal[0] + 80);
+        let indigo = pixel_at(17, 12);
+        assert!(indigo[3] > 200);
+        assert!(indigo[2] > indigo[0] + 80);
     }
 }

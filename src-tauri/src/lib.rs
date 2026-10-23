@@ -455,7 +455,10 @@ pub fn run() {
             });
             let antigravity_refresher = antigravity_manager.clone();
             tauri::async_runtime::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+                // Windows also watches for a fresh Antigravity launch log, which
+                // needs a short tick; elsewhere that check is always false.
+                let tick = if cfg!(target_os = "windows") { 5 } else { 30 };
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(tick));
                 interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                 let mut last_attempt = now_unix_seconds();
                 let mut failures: u32 = 1;
