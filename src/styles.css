@@ -294,11 +294,12 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--focus); o
 .provider-note { margin: 9px 14px 2px; padding: 12px 13px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .provider-note p { margin: 0; color: var(--text-tertiary); font-size: 11px; line-height: 1.5; }
 .provider-note .secondary-button { flex: none; }
-.provider-block[data-provider="claude"] { --provider-accent: #f6d89b; }
-.provider-block[data-provider="cursor"] { --provider-accent: #00b4d8; }
-.provider-block[data-provider="opencode"] { --provider-accent: #a855f7; }
-.provider-block[data-provider="devin"] { --provider-accent: #6366f1; }
-.provider-block[data-provider="antigravity"] { --provider-accent: #3b82f6; }
+.provider-block[data-provider="claude"] { --provider-accent: #d97757; }
+.provider-block[data-provider="cursor"] { --provider-accent: #0f9d8e; }
+.provider-block[data-provider="opencode"] { --provider-accent: #4f46e5; }
+.provider-block[data-provider="devin"] { --provider-accent: #d48426; }
+.provider-block[data-provider="antigravity"] { --provider-accent: #4285f4; }
+.provider-block[data-provider="gemini"] { --provider-accent: #c85ac0; }
 .missing-providers { margin: 14px 14px 12px; padding: 10px 12px 11px; border: 1px solid rgba(91, 72, 132, .1); border-radius: 14px; background: rgba(255, 255, 255, .42); }
 .missing-providers summary { cursor: pointer; color: var(--text-secondary); font: 650 11.5px/16px var(--font-ui); list-style: none; }
 .missing-providers summary::-webkit-details-marker { display: none; }

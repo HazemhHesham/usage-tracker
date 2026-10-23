@@ -4,7 +4,7 @@ cask "usagebar" do
 
   url "https://github.com/abdelrahmanmagdii/usage-tracker/releases/download/v#{version}/UsageBar_#{version}_universal.dmg"
   name "UsageBar"
-  desc "Codex, Claude, Cursor, OpenCode, Devin, and Antigravity quotas in the Mac menu bar"
+  desc "Codex, Claude, Cursor, OpenCode, Devin, Antigravity, and Gemini CLI quotas in the Mac menu bar"
   homepage "https://github.com/abdelrahmanmagdii/usage-tracker"
 
   livecheck do
