@@ -78,16 +78,12 @@ pub async fn refresh_antigravity(
 }
 
 #[tauri::command]
-pub async fn get_gemini_state(
-    manager: State<'_, GeminiManager>,
-) -> Result<ProviderState, String> {
+pub async fn get_gemini_state(manager: State<'_, GeminiManager>) -> Result<ProviderState, String> {
     Ok(manager.snapshot().await)
 }
 
 #[tauri::command]
-pub async fn refresh_gemini(
-    manager: State<'_, GeminiManager>,
-) -> Result<ProviderState, String> {
+pub async fn refresh_gemini(manager: State<'_, GeminiManager>) -> Result<ProviderState, String> {
     manager.refresh().await
 }
 
@@ -200,6 +196,11 @@ pub fn open_post_url(url: String) -> Result<(), String> {
     if !is_openable_post_url(&url) {
         return Err("Only reset post links can be opened.".to_owned());
     }
+    open_in_browser(&url)
+}
+
+/// Hands a vetted https link to the default browser.
+pub fn open_in_browser(url: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         #[link(name = "shell32")]
@@ -237,7 +238,7 @@ pub fn open_post_url(url: String) -> Result<(), String> {
             "xdg-open"
         };
         std::process::Command::new(opener)
-            .arg(&url)
+            .arg(url)
             .spawn()
             .map(|_| ())
             .map_err(|error| error.to_string())

@@ -996,9 +996,8 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
             tauri::process::restart(&app.env());
         }
         "star-github" => {
-            let _ = std::process::Command::new("/usr/bin/open")
-                .arg("https://github.com/abdelrahmanmagdii/usage-tracker")
-                .spawn();
+            let _ =
+                crate::commands::open_in_browser("https://github.com/abdelrahmanmagdii/usage-tracker");
         }
         "show-onboarding" => {
             if let Some(window) = app.get_webview_window("main") {
